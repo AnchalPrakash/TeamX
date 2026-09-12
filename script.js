@@ -15,11 +15,8 @@ const statusMessage = document.getElementById('status-message');
 const resultsTableContainer = document.getElementById('results-table-container');
 const explanationsContainer = document.getElementById('explanations-container');
 
-/**
- * Extracts all text from a single PDF File object using PDF.js.
- * @param {File} file - The PDF file object.
- * @returns {Promise<string>} - The concatenated text of all pages.
- */
+// --- 1. PDF EXTRACTION LOGIC ---
+
 async function extractTextFromPDF(file) {
     const arrayBuffer = await file.arrayBuffer();
     const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
@@ -35,12 +32,6 @@ async function extractTextFromPDF(file) {
     return fullText.trim();
 }
 
-/**
- * Extracts text from multiple PDF files, mapping filenames to their text content.
- * Gracefully skips unreadable or corrupt files.
- * @param {FileList|Array<File>} fileList - The list of PDF files to process.
- * @returns {Promise<Object>} - An object mapping { "filename.pdf": "extracted text..." }
- */
 async function extractTextsFromFiles(fileList) {
     const textsMap = {};
     const filesArray = Array.from(fileList);
@@ -62,33 +53,20 @@ async function extractTextsFromFiles(fileList) {
     return textsMap;
 }
 
-/**
- * Parses a list of required skills from the Job Description text.
- * @param {string} jdText - The extracted text from the JD PDF.
- * @returns {Array<string>} - An array of cleaned skill strings.
- */
+// --- 2. KEYWORD MATCHING LOGIC ---
+
 function extractRequiredSkills(jdText) {
     const sectionRegex = /(?:Required\s+Skills|Technical\s+Skills|Skills)\s*:?\s*\n([\s\S]*?)(?:\n\s*\n|$)/i;
     const match = jdText.match(sectionRegex);
     
-    if (!match || !match[1]) {
-        return [];
-    }
+    if (!match || !match[1]) return [];
     
-    const skillsBlock = match[1];
-    const rawSkills = skillsBlock.split(/[\n•\-*]+/);
-    
+    const rawSkills = match[1].split(/[\n•\-*]+/);
     return rawSkills
         .map(skill => skill.trim())
         .filter(skill => skill.length > 1 && skill.length < 60);
 }
 
-/**
- * Checks how many required skills appear in the resume text, case-insensitively.
- * @param {string} resumeText - The extracted text from the Resume PDF.
- * @param {Array<string>} requiredSkills - The array of skills extracted from the JD.
- * @returns {Object} - { score (0-1), matched: [...], missing: [...] }
- */
 function keywordScore(resumeText, requiredSkills) {
     if (!requiredSkills || requiredSkills.length === 0) {
         return { score: 0, matched: [], missing: [] };
@@ -116,10 +94,39 @@ function keywordScore(resumeText, requiredSkills) {
     return { score, matched, missing };
 }
 
+// --- 3. AI SEMANTIC EMBEDDING LOGIC ---
+
+// Cache for the pipeline and text embeddings to optimize loop performance
+let extractorPipeline = null;
+const embeddingCache = new Map();
+
 /**
- * Calculates the cosine similarity between two numeric vectors.
+ * Returns a mean-pooled, normalized embedding vector for the provided text.
+ * Loads the model on the first run and shows a loading indicator.
  */
-function calculateCosineSimilarity(vecA, vecB) {
+async function getEmbedding(text) {
+    // Return cached vector if this exact text was already processed (e.g., the JD text)
+    if (embeddingCache.has(text)) {
+        return embeddingCache.get(text);
+    }
+
+    if (!extractorPipeline) {
+        statusMessage.textContent = "Status: Downloading/Initializing AI model... (This takes a few seconds on first run)";
+        extractorPipeline = await pipeline('feature-extraction', 'Xenova/all-MiniLM-L6-v2');
+        statusMessage.textContent = "Status: AI Model loaded successfully.";
+    }
+
+    const output = await extractorPipeline(text, { pooling: 'mean', normalize: true });
+    const vector = Array.from(output.data);
+    
+    embeddingCache.set(text, vector);
+    return vector;
+}
+
+/**
+ * Calculates the cosine similarity between two vectors.
+ */
+function cosineSimilarity(vecA, vecB) {
     let dotProduct = 0;
     let normA = 0;
     let normB = 0;
@@ -132,12 +139,21 @@ function calculateCosineSimilarity(vecA, vecB) {
     return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
 }
 
-// Main event listener for ranking candidates
+/**
+ * Embeds both texts and returns their cosine similarity as a 0-1 score.
+ */
+async function semanticScore(jdText, resumeText) {
+    const jdEmbed = await getEmbedding(jdText);
+    const resumeEmbed = await getEmbedding(resumeText);
+    return cosineSimilarity(jdEmbed, resumeEmbed);
+}
+
+// --- 4. MAIN UI EVENT LISTENER ---
+
 rankBtn.addEventListener('click', async () => {
     const jdFile = jdUpload.files[0];
     const resumeFiles = resumeUpload.files;
 
-    // Validation
     if (!jdFile) {
         alert("Please upload a Job Description PDF.");
         return;
@@ -150,71 +166,53 @@ rankBtn.addEventListener('click', async () => {
     try {
         rankBtn.disabled = true;
         statusMessage.style.color = "var(--text-muted)";
-        statusMessage.textContent = "Status: Parsing Job Description and Resumes...";
+        statusMessage.textContent = "Status: Parsing PDFs...";
         resultsTableContainer.innerHTML = '';
         explanationsContainer.innerHTML = '';
 
-        // 1. Extract texts
         const jdText = await extractTextFromPDF(jdFile);
-        if (!jdText) {
-            throw new Error("Could not extract text from the JD file. It might be scanned or empty.");
-        }
+        if (!jdText) throw new Error("Could not extract text from the JD file.");
 
-        // 1a. Extract exact skills for keyword matching
         const extractedSkills = extractRequiredSkills(jdText);
-        console.log("Found JD Skills:", extractedSkills);
-
+        
         const resumesDataMap = await extractTextsFromFiles(resumeFiles);
         const validResumeNames = Object.keys(resumesDataMap);
         
         if (validResumeNames.length === 0) {
-            throw new Error("Could not extract text from any of the uploaded resumes. They might be corrupt or scanned images.");
+            throw new Error("Could not extract text from any of the uploaded resumes.");
         }
 
-        // 2. Initialize Transformers.js pipeline
-        statusMessage.textContent = "Status: Loading AI model for embeddings... (This takes a moment on the first run)";
-        const extractor = await pipeline('feature-extraction', 'Xenova/all-MiniLM-L6-v2');
-
-        // 3. Generate JD Embedding
-        statusMessage.textContent = "Status: Analyzing Job Description...";
-        const jdEmbeddingOutput = await extractor(jdText, { pooling: 'mean', normalize: true });
-        const jdEmbedding = jdEmbeddingOutput.data;
-
-        // 4. Generate Resume Embeddings and Calculate Scores
         statusMessage.textContent = "Status: Scoring Candidates against JD...";
         const scoredResumes = [];
         
         for (const name of validResumeNames) {
             const text = resumesDataMap[name];
             
-            // Calculate Semantic Score (AI)
-            const resumeEmbeddingOutput = await extractor(text, { pooling: 'mean', normalize: true });
-            const resumeEmbedding = resumeEmbeddingOutput.data;
-            const semanticScore = calculateCosineSimilarity(jdEmbedding, resumeEmbedding);
+            // 1. Calculate Semantic Score using the requested function
+            const aiScore = await semanticScore(jdText, text);
             
-            // Calculate Keyword Score (Exact Match)
+            // 2. Calculate Keyword Score
             const keywordData = keywordScore(text, extractedSkills);
             
-            // Hybrid Score: 50% Semantic AI, 50% Exact Keyword Match 
-            // (If no skills were found in JD, rely 100% on Semantic Score)
-            let finalScore = semanticScore;
+            // 3. Hybrid Score (50/50 if skills exist, otherwise 100% AI)
+            let finalScore = aiScore;
             if (extractedSkills.length > 0) {
-                finalScore = (semanticScore + keywordData.score) / 2;
+                finalScore = (aiScore + keywordData.score) / 2;
             }
 
             scoredResumes.push({ 
                 name, 
                 finalScore,
-                semanticScore,
+                aiScore,
                 keywordData,
                 textExcerpt: text.substring(0, 150) + "..." 
             });
         }
 
-        // 5. Sort resumes by highest hybrid score first
+        // Sort highest score first
         scoredResumes.sort((a, b) => b.finalScore - a.finalScore);
 
-        // 6. Build the Results Table HTML
+        // Build Results Table
         let tableHTML = `
             <table style="width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 0.95em;">
                 <thead>
@@ -240,13 +238,13 @@ rankBtn.addEventListener('click', async () => {
         tableHTML += `</tbody></table>`;
         resultsTableContainer.innerHTML = tableHTML;
 
-        // 7. Build the Top 3 Explanations HTML
+        // Build Top 3 Explanations
         const top3 = scoredResumes.slice(0, 3);
         let explanationsHTML = `<div style="display: flex; flex-direction: column; gap: 15px;">`;
         
         top3.forEach((candidate, index) => {
             const finalPercentage = (candidate.finalScore * 100).toFixed(1);
-            const aiPercentage = (candidate.semanticScore * 100).toFixed(1);
+            const aiPercentage = (candidate.aiScore * 100).toFixed(1);
             const keywordPercentage = (candidate.keywordData.score * 100).toFixed(1);
             
             const matchedTags = candidate.keywordData.matched.map(skill => `<span style="display: inline-block; background: #dcfce7; color: #166534; padding: 2px 8px; border-radius: 12px; font-size: 0.8em; margin: 2px;">✓ ${skill}</span>`).join('');
