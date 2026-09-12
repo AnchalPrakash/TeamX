@@ -7,13 +7,21 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs
 // Disable local models to fetch weights strictly from the Hugging Face CDN
 env.allowLocalModels = false;
 
-// DOM Elements
+// DOM Elements & Globals
 const jdUpload = document.getElementById('jd-upload');
 const resumeUpload = document.getElementById('resume-upload');
 const rankBtn = document.getElementById('rank-btn');
 const statusMessage = document.getElementById('status-message');
 const resultsTableContainer = document.getElementById('results-table-container');
 const explanationsContainer = document.getElementById('explanations-container');
+
+// Q&A DOM Elements
+const questionInput = document.getElementById('recruiter-question');
+const askBtn = document.getElementById('ask-btn');
+const answerContainer = document.getElementById('answer-container');
+const answerText = document.getElementById('answer-text');
+
+let currentRankedResults = []; // Stores the latest ranking to be queried by the Q&A feature
 
 // --- 1. PDF EXTRACTION LOGIC ---
 async function extractTextFromPDF(file) {
@@ -176,9 +184,86 @@ function generateExplanation(entry) {
     return text.trim();
 }
 
-// --- 5. MAIN UI EVENT LISTENER ---
+// --- 5. Q&A LOGIC ---
+function answerRecruiterQuestion(question, rankedResults) {
+    if (!rankedResults || rankedResults.length === 0) {
+        return "Please upload and rank the candidates first before asking questions.";
+    }
+
+    const regex = /(?:why did|why is) (.+?) rank(?:ed)? (?:above|higher than|better than|over) (.+?)(?:\?|$)/i;
+    const match = question.match(regex);
+
+    if (!match) {
+        return "I can currently answer direct comparison questions. Please try formatting like: <em>'Why is [Resume A] ranked above [Resume B]?'</em>";
+    }
+
+    const rawName1 = match[1].toLowerCase().trim().replace('.pdf', '');
+    const rawName2 = match[2].toLowerCase().trim().replace('.pdf', '');
+
+    const cand1 = rankedResults.find(r => r.filename.toLowerCase().includes(rawName1));
+    const cand2 = rankedResults.find(r => r.filename.toLowerCase().includes(rawName2));
+
+    if (!cand1 || !cand2) {
+        return `I couldn't find exact matches for those candidates in the current ranking. Please use their filenames. (Looked for "${rawName1}" and "${rawName2}")`;
+    }
+
+    if (cand1.finalScore < cand2.finalScore) {
+        return `Actually, <strong>${cand2.filename}</strong> is ranked higher than <strong>${cand1.filename}</strong>!`;
+    }
+
+    const score1 = (cand1.finalScore * 100).toFixed(1);
+    const score2 = (cand2.finalScore * 100).toFixed(1);
+    const ai1 = (cand1.semanticScore * 100).toFixed(1);
+    const ai2 = (cand2.semanticScore * 100).toFixed(1);
+
+    let answer = `<strong>${cand1.filename}</strong> achieved a higher overall score (${score1}% vs ${score2}%).<br><br>`;
+
+    const matched1 = cand1.matched ? cand1.matched.length : 0;
+    const matched2 = cand2.matched ? cand2.matched.length : 0;
+
+    if (matched1 > matched2) {
+        answer += `<strong>Keyword Matches:</strong> ${cand1.filename} explicitly matched more required skills (${matched1} vs ${matched2}). `;
+        const uniqueTo1 = cand1.matched.filter(s => !cand2.matched.includes(s));
+        if (uniqueTo1.length > 0) {
+            answer += `Specifically, they had exact matches for <em>${uniqueTo1.join(', ')}</em> which ${cand2.filename} missed. <br><br>`;
+        }
+    } else if (matched2 > matched1) {
+        answer += `<strong>Keyword Matches:</strong> Interestingly, ${cand2.filename} actually matched more explicit keywords (${matched2} vs ${matched1}), but ${cand1.filename}'s contextual alignment pulled them ahead. <br><br>`;
+    } else if (matched1 > 0) {
+        answer += `<strong>Keyword Matches:</strong> Both candidates matched the exact same number of required skills (${matched1}). <br><br>`;
+    }
+
+    if (cand1.semanticScore > cand2.semanticScore) {
+        answer += `<strong>Semantic AI Score:</strong> Our AI determined that ${cand1.filename}'s overall experience and context aligned better with the Job Description (${ai1}% vs ${ai2}% semantic match).`;
+    } else {
+        answer += `<strong>Semantic AI Score:</strong> ${cand2.filename} had a slightly better semantic match (${ai2}% vs ${ai1}%), but ${cand1.filename}'s exact keyword matches gave them the overall lead.`;
+    }
+
+    return answer;
+}
+
+// --- 6. EVENT LISTENERS ---
+
+// Ask Button Logic
+if(askBtn) {
+    askBtn.addEventListener('click', () => {
+        const question = questionInput.value.trim();
+        if (!question) return;
+
+        askBtn.textContent = "Analyzing...";
+        answerContainer.style.display = 'none';
+
+        setTimeout(() => {
+            const answerHtml = answerRecruiterQuestion(question, currentRankedResults);
+            answerText.innerHTML = answerHtml;
+            answerContainer.style.display = 'block';
+            askBtn.textContent = "Ask AI";
+        }, 400); 
+    });
+}
+
+// Rank Button Logic
 rankBtn.addEventListener('click', async () => {
-    // 1. Read the JD file and resume files from the file inputs
     const jdFile = jdUpload.files[0];
     const resumeFiles = resumeUpload.files;
 
@@ -186,7 +271,6 @@ rankBtn.addEventListener('click', async () => {
     if (resumeFiles.length === 0) return alert("Please upload at least one Resume PDF.");
 
     try {
-        // 7. Show loading state on button and status message
         rankBtn.disabled = true;
         rankBtn.textContent = "Processing...";
         statusMessage.style.color = "var(--text-muted)";
@@ -194,7 +278,6 @@ rankBtn.addEventListener('click', async () => {
         resultsTableContainer.innerHTML = '';
         explanationsContainer.innerHTML = '';
 
-        // 2. Extract all text via extractTextFromPDF / extractTextsFromFiles
         const jdText = await extractTextFromPDF(jdFile);
         if (!jdText) throw new Error("Could not extract text from the JD file.");
 
@@ -203,38 +286,37 @@ rankBtn.addEventListener('click', async () => {
             throw new Error("Could not extract text from any of the uploaded resumes.");
         }
 
-        // 3. Extract required skills from the JD
         const extractedSkills = extractRequiredSkills(jdText);
 
-        // 4. Run rankResumes()
         statusMessage.textContent = "Status: Generating embeddings and scoring candidates...";
-        const scoredResumes = await rankResumes(jdText, extractedSkills, resumesDataMap);
+        
+        // Save to the global variable for the Q&A feature
+        currentRankedResults = await rankResumes(jdText, extractedSkills, resumesDataMap);
 
-        // 5. Render the full ranked list into the results table
         let tableHTML = `
             <table style="width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 0.9em;">
                 <thead>
-                    <tr style="background-color: #f9fafb; text-align: left;">
-                        <th style="padding: 12px; border-bottom: 2px solid #e5e7eb;">Rank</th>
-                        <th style="padding: 12px; border-bottom: 2px solid #e5e7eb;">Candidate Resume</th>
-                        <th style="padding: 12px; border-bottom: 2px solid #e5e7eb;">Final Score</th>
-                        <th style="padding: 12px; border-bottom: 2px solid #e5e7eb;">Keyword Score</th>
-                        <th style="padding: 12px; border-bottom: 2px solid #e5e7eb;">Semantic Score</th>
+                    <tr style="background-color: var(--bg-light); text-align: left;">
+                        <th style="padding: 12px; border-bottom: 2px solid var(--border-light);">Rank</th>
+                        <th style="padding: 12px; border-bottom: 2px solid var(--border-light);">Candidate Resume</th>
+                        <th style="padding: 12px; border-bottom: 2px solid var(--border-light);">Final Score</th>
+                        <th style="padding: 12px; border-bottom: 2px solid var(--border-light);">Keyword Score</th>
+                        <th style="padding: 12px; border-bottom: 2px solid var(--border-light);">Semantic Score</th>
                     </tr>
                 </thead>
                 <tbody>
         `;
         
-        scoredResumes.forEach((candidate, index) => {
+        currentRankedResults.forEach((candidate, index) => {
             const finalPct = (candidate.finalScore * 100).toFixed(1);
             const keywordPct = candidate.keywordScore !== undefined ? (candidate.keywordScore * 100).toFixed(1) + '%' : 'N/A';
             const semanticPct = (candidate.semanticScore * 100).toFixed(1);
             
             tableHTML += `
-                <tr style="border-bottom: 1px solid #e5e7eb; transition: background-color 0.2s;">
-                    <td style="padding: 12px; font-weight: bold; color: #475569;">#${index + 1}</td>
-                    <td style="padding: 12px; word-break: break-all; color: #1e293b;">${candidate.filename}</td>
-                    <td style="padding: 12px; color: #2563eb; font-weight: 700;">${finalPct}%</td>
+                <tr style="border-bottom: 1px solid var(--border-light); transition: background-color 0.2s;">
+                    <td style="padding: 12px; font-weight: bold; color: var(--dark-slate);">#${index + 1}</td>
+                    <td style="padding: 12px; word-break: break-all; color: var(--dark-slate);">${candidate.filename}</td>
+                    <td style="padding: 12px; color: var(--brand-green); font-weight: 700;">${finalPct}%</td>
                     <td style="padding: 12px; color: #64748b;">${keywordPct}</td>
                     <td style="padding: 12px; color: #64748b;">${semanticPct}%</td>
                 </tr>
@@ -243,21 +325,20 @@ rankBtn.addEventListener('click', async () => {
         tableHTML += `</tbody></table>`;
         resultsTableContainer.innerHTML = tableHTML;
 
-        // 6. Render the top 3 with their generateExplanation() text
-        const top3 = scoredResumes.slice(0, 3);
+        const top3 = currentRankedResults.slice(0, 3);
         let explanationsHTML = `<div style="display: flex; flex-direction: column; gap: 15px;">`;
         
         top3.forEach((candidate, index) => {
             const dynamicExplanation = generateExplanation(candidate);
             
             explanationsHTML += `
-                <div style="background: #f8fafc; border-left: 4px solid #2563eb; padding: 15px; border-radius: 4px;">
-                    <h3 style="margin: 0 0 8px 0; font-size: 1.1em; color: #1e293b;">
+                <div style="background: var(--bg-light); border-left: 4px solid var(--brand-green); padding: 15px; border-radius: 4px;">
+                    <h3 style="margin: 0 0 8px 0; font-size: 1.1em; color: var(--dark-slate);">
                         Rank #${index + 1}: ${candidate.filename}
                     </h3>
                     <div style="font-size: 0.9em; color: #475569;">
-                        <p style="margin: 0 0 10px 0; color: #334155; line-height: 1.5;">${dynamicExplanation}</p>
-                        <p style="margin: 8px 0 0 0; background: #fff; padding: 10px; border: 1px dashed #cbd5e1; border-radius: 4px; color: #64748b;">
+                        <p style="margin: 0 0 10px 0; color: var(--dark-slate); line-height: 1.5;">${dynamicExplanation}</p>
+                        <p style="margin: 8px 0 0 0; background: #fff; padding: 10px; border: 1px dashed var(--border-light); border-radius: 4px; color: #64748b;">
                             <strong>Snippet:</strong> "${candidate.textExcerpt}"
                         </p>
                     </div>
@@ -267,7 +348,7 @@ rankBtn.addEventListener('click', async () => {
         explanationsHTML += `</div>`;
         explanationsContainer.innerHTML = explanationsHTML;
 
-        statusMessage.style.color = "#166534";
+        statusMessage.style.color = "var(--brand-green)";
         statusMessage.textContent = "Status: Ranking complete!";
         
     } catch (error) {
@@ -275,8 +356,7 @@ rankBtn.addEventListener('click', async () => {
         statusMessage.style.color = "red";
         statusMessage.textContent = `Error: ${error.message}`;
     } finally {
-        // Reset button state
         rankBtn.disabled = false;
-        rankBtn.textContent = "Rank Candidates";
+        rankBtn.textContent = "Let's Go! Rank Resumes";
     }
 });
