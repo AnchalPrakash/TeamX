@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Resume Ranking System</title>
+    <link rel="stylesheet" href="style.css">
+    
+    <!-- PDF.js from CDN for parsing PDFs -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <h1>AI Resume Ranking System</h1>
+        
+        <div class="card upload-section">
+            <div class="form-group">
+                <label for="jd-upload">Upload Job Description (PDF):</label>
+                <input type="file" id="jd-upload" accept="application/pdf">
+            </div>
+            
+            <div class="form-group">
+                <label for="resume-upload">Upload Resumes (PDF):</label>
+                <!-- Multi-file input for resumes -->
+                <input type="file" id="resume-upload" accept="application/pdf" multiple>
+            </div>
+            
+            <button id="rank-btn">Rank Candidates</button>
+            <p id="status-message"></p>
+        </div>
+
+        <div class="results-grid">
+            <div class="card table-card">
+                <h2>Ranking Results</h2>
+                <!-- Empty container for the results table -->
+                <div id="results-table-container">
+                    <p class="placeholder-text">Upload documents and click "Rank Candidates" to view results.</p>
+                </div>
+            </div>
+
+            <div class="card explanations-card">
+                <h2>Top 3 Candidate Explanations</h2>
+                <!-- Empty container for the top 3 explanations -->
+                <div id="explanations-container">
+                    <p class="placeholder-text">Explanations will appear here.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main logic as an ES module -->
+    <script type="module" src="script.js"></script>
+</body>
+</html>
