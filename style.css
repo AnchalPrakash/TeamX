@@ -130,12 +130,19 @@ h1, h2, h3 {
 .circle-main {
     width: 350px;
     height: 350px;
-    background-color: var(--dark-slate);
+    background-color: var(--dark-slate); /* Keeps the color while the image loads */
+    
+    /* --- NEW IMAGE CODE --- */
+    background-image: url('profile.jpg'); /* Make sure this matches your file name exactly! */
+    background-size: cover;               /* Ensures the image fills the circle */
+    background-position: center top;      /* Centers the image nicely */
+    /* ---------------------- */
+    
     border-radius: 50%;
     position: absolute;
     right: 50px;
+    box-shadow: 0 15px 35px rgba(0,0,0,0.15); /* Added a subtle shadow to make it pop */
 }
-
 .circle-small {
     width: 40px;
     height: 40px;
