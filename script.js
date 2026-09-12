@@ -63,6 +63,60 @@ async function extractTextsFromFiles(fileList) {
 }
 
 /**
+ * Parses a list of required skills from the Job Description text.
+ * @param {string} jdText - The extracted text from the JD PDF.
+ * @returns {Array<string>} - An array of cleaned skill strings.
+ */
+function extractRequiredSkills(jdText) {
+    const sectionRegex = /(?:Required\s+Skills|Technical\s+Skills|Skills)\s*:?\s*\n([\s\S]*?)(?:\n\s*\n|$)/i;
+    const match = jdText.match(sectionRegex);
+    
+    if (!match || !match[1]) {
+        return [];
+    }
+    
+    const skillsBlock = match[1];
+    const rawSkills = skillsBlock.split(/[\n•\-*]+/);
+    
+    return rawSkills
+        .map(skill => skill.trim())
+        .filter(skill => skill.length > 1 && skill.length < 60);
+}
+
+/**
+ * Checks how many required skills appear in the resume text, case-insensitively.
+ * @param {string} resumeText - The extracted text from the Resume PDF.
+ * @param {Array<string>} requiredSkills - The array of skills extracted from the JD.
+ * @returns {Object} - { score (0-1), matched: [...], missing: [...] }
+ */
+function keywordScore(resumeText, requiredSkills) {
+    if (!requiredSkills || requiredSkills.length === 0) {
+        return { score: 0, matched: [], missing: [] };
+    }
+
+    const normalize = (str) => str.toLowerCase().replace(/[\W_]+/g, '');
+    const normalizedResume = normalize(resumeText);
+    const matched = [];
+    const missing = [];
+    
+    requiredSkills.forEach(skill => {
+        const normalizedSkill = normalize(skill);
+        if (normalizedSkill.length === 0) return;
+        
+        if (normalizedResume.includes(normalizedSkill)) {
+            matched.push(skill);
+        } else {
+            missing.push(skill);
+        }
+    });
+    
+    const totalValidSkills = matched.length + missing.length;
+    const score = totalValidSkills === 0 ? 0 : matched.length / totalValidSkills;
+    
+    return { score, matched, missing };
+}
+
+/**
  * Calculates the cosine similarity between two numeric vectors.
  */
 function calculateCosineSimilarity(vecA, vecB) {
@@ -106,6 +160,10 @@ rankBtn.addEventListener('click', async () => {
             throw new Error("Could not extract text from the JD file. It might be scanned or empty.");
         }
 
+        // 1a. Extract exact skills for keyword matching
+        const extractedSkills = extractRequiredSkills(jdText);
+        console.log("Found JD Skills:", extractedSkills);
+
         const resumesDataMap = await extractTextsFromFiles(resumeFiles);
         const validResumeNames = Object.keys(resumesDataMap);
         
@@ -128,19 +186,33 @@ rankBtn.addEventListener('click', async () => {
         
         for (const name of validResumeNames) {
             const text = resumesDataMap[name];
+            
+            // Calculate Semantic Score (AI)
             const resumeEmbeddingOutput = await extractor(text, { pooling: 'mean', normalize: true });
             const resumeEmbedding = resumeEmbeddingOutput.data;
+            const semanticScore = calculateCosineSimilarity(jdEmbedding, resumeEmbedding);
             
-            const score = calculateCosineSimilarity(jdEmbedding, resumeEmbedding);
+            // Calculate Keyword Score (Exact Match)
+            const keywordData = keywordScore(text, extractedSkills);
+            
+            // Hybrid Score: 50% Semantic AI, 50% Exact Keyword Match 
+            // (If no skills were found in JD, rely 100% on Semantic Score)
+            let finalScore = semanticScore;
+            if (extractedSkills.length > 0) {
+                finalScore = (semanticScore + keywordData.score) / 2;
+            }
+
             scoredResumes.push({ 
                 name, 
-                score, 
+                finalScore,
+                semanticScore,
+                keywordData,
                 textExcerpt: text.substring(0, 150) + "..." 
             });
         }
 
-        // 5. Sort resumes by highest score first
-        scoredResumes.sort((a, b) => b.score - a.score);
+        // 5. Sort resumes by highest hybrid score first
+        scoredResumes.sort((a, b) => b.finalScore - a.finalScore);
 
         // 6. Build the Results Table HTML
         let tableHTML = `
@@ -156,7 +228,7 @@ rankBtn.addEventListener('click', async () => {
         `;
         
         scoredResumes.forEach((candidate, index) => {
-            const percentage = (candidate.score * 100).toFixed(2);
+            const percentage = (candidate.finalScore * 100).toFixed(2);
             tableHTML += `
                 <tr style="border-bottom: 1px solid #e5e7eb;">
                     <td style="padding: 12px;"><strong>#${index + 1}</strong></td>
@@ -173,17 +245,32 @@ rankBtn.addEventListener('click', async () => {
         let explanationsHTML = `<div style="display: flex; flex-direction: column; gap: 15px;">`;
         
         top3.forEach((candidate, index) => {
-            const percentage = (candidate.score * 100).toFixed(1);
+            const finalPercentage = (candidate.finalScore * 100).toFixed(1);
+            const aiPercentage = (candidate.semanticScore * 100).toFixed(1);
+            const keywordPercentage = (candidate.keywordData.score * 100).toFixed(1);
+            
+            const matchedTags = candidate.keywordData.matched.map(skill => `<span style="display: inline-block; background: #dcfce7; color: #166534; padding: 2px 8px; border-radius: 12px; font-size: 0.8em; margin: 2px;">✓ ${skill}</span>`).join('');
+            const missingTags = candidate.keywordData.missing.map(skill => `<span style="display: inline-block; background: #fee2e2; color: #991b1b; padding: 2px 8px; border-radius: 12px; font-size: 0.8em; margin: 2px;">✕ ${skill}</span>`).join('');
+
             explanationsHTML += `
                 <div style="background: #f8fafc; border-left: 4px solid #2563eb; padding: 15px; border-radius: 4px;">
                     <h3 style="margin: 0 0 8px 0; font-size: 1.1em; color: #1e293b;">
                         Rank #${index + 1}: ${candidate.name}
                     </h3>
                     <div style="font-size: 0.9em; color: #475569;">
-                        <p style="margin: 0 0 8px 0;"><strong>Score:</strong> ${percentage}% Semantic Match</p>
-                        <p style="margin: 0;"><em>Based on the AI embedding comparison, this resume's terminology and semantic intent closely align with the provided job description.</em></p>
+                        <p style="margin: 0 0 8px 0;"><strong>Overall Score:</strong> ${finalPercentage}% (AI Semantic Match: ${aiPercentage}% | Exact Keyword Match: ${extractedSkills.length > 0 ? keywordPercentage + '%' : 'N/A'})</p>
+                        
+                        ${extractedSkills.length > 0 ? `
+                        <div style="margin-bottom: 8px;">
+                            <strong>Matched Skills:</strong> ${matchedTags || '<em>None</em>'}
+                        </div>
+                        <div style="margin-bottom: 8px;">
+                            <strong>Missing Skills:</strong> ${missingTags || '<em>None</em>'}
+                        </div>
+                        ` : '<p style="color: #d97706; margin-bottom: 8px;"><em>Could not parse a strict "Required Skills" list from the JD format. Score based entirely on AI semantic understanding.</em></p>'}
+                        
                         <p style="margin: 8px 0 0 0; background: #fff; padding: 10px; border: 1px dashed #cbd5e1; border-radius: 4px;">
-                            <strong>Snippet:</strong> "${candidate.textExcerpt}"
+                            <strong>Resume Snippet:</strong> "${candidate.textExcerpt}"
                         </p>
                     </div>
                 </div>
