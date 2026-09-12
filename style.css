@@ -72,6 +72,7 @@ h1 {
     color: #374151;
 }
 
+/* Style the file input container */
 input[type="file"] {
     display: block;
     width: 100%;
@@ -83,8 +84,27 @@ input[type="file"] {
     color: var(--text-muted);
     cursor: pointer;
     transition: all 0.2s ease;
+    font-family: inherit;
 }
 
+/* Hide the ugly default "Choose File" button and replace it with a custom look */
+input[type="file"]::file-selector-button {
+    background-color: #e2e8f0;
+    color: #475569;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 4px;
+    margin-right: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+
+input[type="file"]::file-selector-button:hover {
+    background-color: #cbd5e1;
+}
+
+/* The hover state for the whole dashed box */
 input[type="file"]:hover {
     border-color: var(--primary-color);
     background-color: #eff6ff;
