@@ -96,16 +96,10 @@ function keywordScore(resumeText, requiredSkills) {
 
 // --- 3. AI SEMANTIC EMBEDDING LOGIC ---
 
-// Cache for the pipeline and text embeddings to optimize loop performance
 let extractorPipeline = null;
 const embeddingCache = new Map();
 
-/**
- * Returns a mean-pooled, normalized embedding vector for the provided text.
- * Loads the model on the first run and shows a loading indicator.
- */
 async function getEmbedding(text) {
-    // Return cached vector if this exact text was already processed (e.g., the JD text)
     if (embeddingCache.has(text)) {
         return embeddingCache.get(text);
     }
@@ -123,9 +117,6 @@ async function getEmbedding(text) {
     return vector;
 }
 
-/**
- * Calculates the cosine similarity between two vectors.
- */
 function cosineSimilarity(vecA, vecB) {
     let dotProduct = 0;
     let normA = 0;
@@ -139,16 +130,56 @@ function cosineSimilarity(vecA, vecB) {
     return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
 }
 
-/**
- * Embeds both texts and returns their cosine similarity as a 0-1 score.
- */
 async function semanticScore(jdText, resumeText) {
     const jdEmbed = await getEmbedding(jdText);
     const resumeEmbed = await getEmbedding(resumeText);
     return cosineSimilarity(jdEmbed, resumeEmbed);
 }
 
-// --- 4. MAIN UI EVENT LISTENER ---
+// --- 4. ORCHESTRATION & RANKING LOGIC ---
+
+/**
+ * Computes hybrid scores for multiple resumes and ranks them.
+ * 
+ * @param {string} jdText - The extracted text from the Job Description.
+ * @param {Array<string>} requiredSkills - Array of parsed required skills.
+ * @param {Object} resumeTexts - Map of { filename: text }.
+ * @returns {Promise<Array<Object>>} - Sorted array of candidate scores.
+ */
+async function rankResumes(jdText, requiredSkills, resumeTexts) {
+    const scoredResumes = [];
+    const filenames = Object.keys(resumeTexts);
+
+    for (const filename of filenames) {
+        const text = resumeTexts[filename];
+        
+        const keywordData = keywordScore(text, requiredSkills);
+        const aiScore = await semanticScore(jdText, text);
+        
+        // 50/50 split if skills were found, else 100% semantic score
+        let finalScore = aiScore;
+        if (requiredSkills && requiredSkills.length > 0) {
+            finalScore = (0.5 * keywordData.score) + (0.5 * aiScore);
+        }
+        
+        scoredResumes.push({
+            filename,
+            finalScore,
+            keywordScore: keywordData.score,
+            semanticScore: aiScore,
+            matched: keywordData.matched,
+            missing: keywordData.missing,
+            textExcerpt: text.substring(0, 150) + "..." // Attached for UI rendering
+        });
+    }
+    
+    // Sort best to worst by finalScore
+    scoredResumes.sort((a, b) => b.finalScore - a.finalScore);
+    
+    return scoredResumes;
+}
+
+// --- 5. MAIN UI EVENT LISTENER ---
 
 rankBtn.addEventListener('click', async () => {
     const jdFile = jdUpload.files[0];
@@ -176,41 +207,14 @@ rankBtn.addEventListener('click', async () => {
         const extractedSkills = extractRequiredSkills(jdText);
         
         const resumesDataMap = await extractTextsFromFiles(resumeFiles);
-        const validResumeNames = Object.keys(resumesDataMap);
-        
-        if (validResumeNames.length === 0) {
+        if (Object.keys(resumesDataMap).length === 0) {
             throw new Error("Could not extract text from any of the uploaded resumes.");
         }
 
         statusMessage.textContent = "Status: Scoring Candidates against JD...";
-        const scoredResumes = [];
         
-        for (const name of validResumeNames) {
-            const text = resumesDataMap[name];
-            
-            // 1. Calculate Semantic Score using the requested function
-            const aiScore = await semanticScore(jdText, text);
-            
-            // 2. Calculate Keyword Score
-            const keywordData = keywordScore(text, extractedSkills);
-            
-            // 3. Hybrid Score (50/50 if skills exist, otherwise 100% AI)
-            let finalScore = aiScore;
-            if (extractedSkills.length > 0) {
-                finalScore = (aiScore + keywordData.score) / 2;
-            }
-
-            scoredResumes.push({ 
-                name, 
-                finalScore,
-                aiScore,
-                keywordData,
-                textExcerpt: text.substring(0, 150) + "..." 
-            });
-        }
-
-        // Sort highest score first
-        scoredResumes.sort((a, b) => b.finalScore - a.finalScore);
+        // Orchestrate the ranking
+        const scoredResumes = await rankResumes(jdText, extractedSkills, resumesDataMap);
 
         // Build Results Table
         let tableHTML = `
@@ -230,7 +234,7 @@ rankBtn.addEventListener('click', async () => {
             tableHTML += `
                 <tr style="border-bottom: 1px solid #e5e7eb;">
                     <td style="padding: 12px;"><strong>#${index + 1}</strong></td>
-                    <td style="padding: 12px; word-break: break-all;">${candidate.name}</td>
+                    <td style="padding: 12px; word-break: break-all;">${candidate.filename}</td>
                     <td style="padding: 12px; color: #2563eb; font-weight: 600;">${percentage}%</td>
                 </tr>
             `;
@@ -244,16 +248,16 @@ rankBtn.addEventListener('click', async () => {
         
         top3.forEach((candidate, index) => {
             const finalPercentage = (candidate.finalScore * 100).toFixed(1);
-            const aiPercentage = (candidate.aiScore * 100).toFixed(1);
-            const keywordPercentage = (candidate.keywordData.score * 100).toFixed(1);
+            const aiPercentage = (candidate.semanticScore * 100).toFixed(1);
+            const keywordPercentage = (candidate.keywordScore * 100).toFixed(1);
             
-            const matchedTags = candidate.keywordData.matched.map(skill => `<span style="display: inline-block; background: #dcfce7; color: #166534; padding: 2px 8px; border-radius: 12px; font-size: 0.8em; margin: 2px;">✓ ${skill}</span>`).join('');
-            const missingTags = candidate.keywordData.missing.map(skill => `<span style="display: inline-block; background: #fee2e2; color: #991b1b; padding: 2px 8px; border-radius: 12px; font-size: 0.8em; margin: 2px;">✕ ${skill}</span>`).join('');
+            const matchedTags = candidate.matched.map(skill => `<span style="display: inline-block; background: #dcfce7; color: #166534; padding: 2px 8px; border-radius: 12px; font-size: 0.8em; margin: 2px;">✓ ${skill}</span>`).join('');
+            const missingTags = candidate.missing.map(skill => `<span style="display: inline-block; background: #fee2e2; color: #991b1b; padding: 2px 8px; border-radius: 12px; font-size: 0.8em; margin: 2px;">✕ ${skill}</span>`).join('');
 
             explanationsHTML += `
                 <div style="background: #f8fafc; border-left: 4px solid #2563eb; padding: 15px; border-radius: 4px;">
                     <h3 style="margin: 0 0 8px 0; font-size: 1.1em; color: #1e293b;">
-                        Rank #${index + 1}: ${candidate.name}
+                        Rank #${index + 1}: ${candidate.filename}
                     </h3>
                     <div style="font-size: 0.9em; color: #475569;">
                         <p style="margin: 0 0 8px 0;"><strong>Overall Score:</strong> ${finalPercentage}% (AI Semantic Match: ${aiPercentage}% | Exact Keyword Match: ${extractedSkills.length > 0 ? keywordPercentage + '%' : 'N/A'})</p>
