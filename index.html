@@ -88,7 +88,20 @@
                 </div>
             </div>
         </div>
-        
+        <!-- Ask the AI Recruiter Section -->
+        <div class="result-box" style="margin-top: 30px;">
+            <h2>Ask the AI Recruiter</h2>
+            <p>Want to know why a decision was made? Ask a comparison question (e.g., <em>"Why is Candidate A ranked above Candidate B?"</em>).</p>
+            
+            <div style="display: flex; gap: 15px; margin-top: 15px;">
+                <input type="text" id="recruiter-question" placeholder="Why is [Filename 1] ranked above [Filename 2]?" style="flex: 1; padding: 12px; border: 1px solid rgba(37, 61, 71, 0.2); border-radius: 8px; font-family: inherit; font-size: 0.95em;">
+                <button id="ask-btn" class="nav-btn" style="border-radius: 8px;">Ask AI</button>
+            </div>
+            
+            <div id="answer-container" style="display: none; background: var(--bg-light); border-left: 4px solid var(--brand-green); padding: 20px; border-radius: 8px; margin-top: 20px;">
+                <p id="answer-text" style="margin: 0; font-size: 0.95em; color: var(--dark-slate);"></p>
+            </div>
+        </div>
     </div>
 
     <!-- Main logic as an ES module -->
