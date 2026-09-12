@@ -136,16 +136,8 @@ async function semanticScore(jdText, resumeText) {
     return cosineSimilarity(jdEmbed, resumeEmbed);
 }
 
-// --- 4. ORCHESTRATION & RANKING LOGIC ---
+// --- 4. ORCHESTRATION & EXPLANATION LOGIC ---
 
-/**
- * Computes hybrid scores for multiple resumes and ranks them.
- * 
- * @param {string} jdText - The extracted text from the Job Description.
- * @param {Array<string>} requiredSkills - Array of parsed required skills.
- * @param {Object} resumeTexts - Map of { filename: text }.
- * @returns {Promise<Array<Object>>} - Sorted array of candidate scores.
- */
 async function rankResumes(jdText, requiredSkills, resumeTexts) {
     const scoredResumes = [];
     const filenames = Object.keys(resumeTexts);
@@ -156,7 +148,6 @@ async function rankResumes(jdText, requiredSkills, resumeTexts) {
         const keywordData = keywordScore(text, requiredSkills);
         const aiScore = await semanticScore(jdText, text);
         
-        // 50/50 split if skills were found, else 100% semantic score
         let finalScore = aiScore;
         if (requiredSkills && requiredSkills.length > 0) {
             finalScore = (0.5 * keywordData.score) + (0.5 * aiScore);
@@ -169,14 +160,47 @@ async function rankResumes(jdText, requiredSkills, resumeTexts) {
             semanticScore: aiScore,
             matched: keywordData.matched,
             missing: keywordData.missing,
-            textExcerpt: text.substring(0, 150) + "..." // Attached for UI rendering
+            textExcerpt: text.substring(0, 150) + "..."
         });
     }
     
-    // Sort best to worst by finalScore
     scoredResumes.sort((a, b) => b.finalScore - a.finalScore);
-    
     return scoredResumes;
+}
+
+/**
+ * Generates a 2-3 sentence explanation of why a candidate ranked where they did.
+ * @param {Object} entry - A single ranked resume object.
+ * @returns {string} - Plain English explanation text.
+ */
+function generateExplanation(entry) {
+    const finalPercent = (entry.finalScore * 100).toFixed(1);
+    let text = `This candidate achieved a final match score of ${finalPercent}%. `;
+
+    // If no explicit skills were parsed from the JD
+    if (!entry.matched || !entry.missing || (entry.matched.length === 0 && entry.missing.length === 0)) {
+        text += `Because no distinct bullet-point skills were extracted from the job description, this ranking is based entirely on the AI's semantic understanding of their experience.`;
+        return text;
+    }
+
+    // Handle matched skills
+    if (entry.matched.length > 0) {
+        // Limit to listing 5 to keep it concise, just in case there are a ton
+        const displayMatches = entry.matched.slice(0, 5).join(", ");
+        text += `Their resume successfully highlighted key qualifications, including ${displayMatches}. `;
+    } else {
+        text += `Unfortunately, their resume did not contain explicit matches for any of the required keywords. `;
+    }
+
+    // Handle missing skills
+    if (entry.missing.length > 0) {
+        const displayMissing = entry.missing.slice(0, 5).join(", ");
+        text += `However, they appear to be missing certain required skills such as ${displayMissing}.`;
+    } else if (entry.matched.length > 0) {
+        text += `Impressively, they perfectly matched every explicit skill required for the role.`;
+    }
+
+    return text.trim();
 }
 
 // --- 5. MAIN UI EVENT LISTENER ---
@@ -213,7 +237,6 @@ rankBtn.addEventListener('click', async () => {
 
         statusMessage.textContent = "Status: Scoring Candidates against JD...";
         
-        // Orchestrate the ranking
         const scoredResumes = await rankResumes(jdText, extractedSkills, resumesDataMap);
 
         // Build Results Table
@@ -253,6 +276,9 @@ rankBtn.addEventListener('click', async () => {
             
             const matchedTags = candidate.matched.map(skill => `<span style="display: inline-block; background: #dcfce7; color: #166534; padding: 2px 8px; border-radius: 12px; font-size: 0.8em; margin: 2px;">✓ ${skill}</span>`).join('');
             const missingTags = candidate.missing.map(skill => `<span style="display: inline-block; background: #fee2e2; color: #991b1b; padding: 2px 8px; border-radius: 12px; font-size: 0.8em; margin: 2px;">✕ ${skill}</span>`).join('');
+            
+            // Get the dynamically generated explanation string
+            const dynamicExplanation = generateExplanation(candidate);
 
             explanationsHTML += `
                 <div style="background: #f8fafc; border-left: 4px solid #2563eb; padding: 15px; border-radius: 4px;">
@@ -260,8 +286,10 @@ rankBtn.addEventListener('click', async () => {
                         Rank #${index + 1}: ${candidate.filename}
                     </h3>
                     <div style="font-size: 0.9em; color: #475569;">
-                        <p style="margin: 0 0 8px 0;"><strong>Overall Score:</strong> ${finalPercentage}% (AI Semantic Match: ${aiPercentage}% | Exact Keyword Match: ${extractedSkills.length > 0 ? keywordPercentage + '%' : 'N/A'})</p>
+                        <p style="margin: 0 0 10px 0;"><strong>Overall Score:</strong> ${finalPercentage}% (AI Semantic Match: ${aiPercentage}% | Exact Keyword Match: ${extractedSkills.length > 0 ? keywordPercentage + '%' : 'N/A'})</p>
                         
+                        <p style="margin: 0 0 10px 0; color: #334155; line-height: 1.5;">${dynamicExplanation}</p>
+
                         ${extractedSkills.length > 0 ? `
                         <div style="margin-bottom: 8px;">
                             <strong>Matched Skills:</strong> ${matchedTags || '<em>None</em>'}
@@ -269,7 +297,7 @@ rankBtn.addEventListener('click', async () => {
                         <div style="margin-bottom: 8px;">
                             <strong>Missing Skills:</strong> ${missingTags || '<em>None</em>'}
                         </div>
-                        ` : '<p style="color: #d97706; margin-bottom: 8px;"><em>Could not parse a strict "Required Skills" list from the JD format. Score based entirely on AI semantic understanding.</em></p>'}
+                        ` : ''}
                         
                         <p style="margin: 8px 0 0 0; background: #fff; padding: 10px; border: 1px dashed #cbd5e1; border-radius: 4px;">
                             <strong>Resume Snippet:</strong> "${candidate.textExcerpt}"
