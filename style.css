@@ -134,7 +134,7 @@ h1, h2, h3 {
     background-image: url('profile.jpg'); 
     
     /* --- UPDATED FRAMING --- */
-    background-size: 105%;          /* Zoomed out to fit the pad */
+    background-size: 110%;          /* Zoomed out to fit the pad */
     background-position: center 0%; /* Anchored to the top so his head doesn't get cut off */
     /* ----------------------- */
     
