@@ -4,48 +4,95 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AI Resume Ranking System</title>
+    <!-- Importing Poppins font for that modern agency look -->
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
     
     <!-- PDF.js from CDN for parsing PDFs -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 </head>
 <body>
+
+    <!-- Faux Navigation Bar -->
+    <nav class="navbar">
+        <div class="nav-logo">
+            <div class="logo-icon"></div>
+            <strong>AI</strong> Recruiter
+        </div>
+        <div class="nav-links">
+            <a href="#">About ▾</a>
+            <a href="#">Employers ▾</a>
+            <a href="#">Resources</a>
+            <a href="#">Contact Us ▾</a>
+        </div>
+        <button class="nav-btn">Browse Careers</button>
+    </nav>
+
     <div class="container">
-        <h1>AI Resume Ranking System</h1>
         
-        <div class="card upload-section">
-            <div class="form-group">
-                <label for="jd-upload">Upload Job Description (PDF):</label>
-                <input type="file" id="jd-upload" accept="application/pdf">
+        <!-- Hero Section -->
+        <div class="hero">
+            <div class="hero-content">
+                <p class="kicker">AI-POWERED RECRUITING AGENCY</p>
+                <h1>Leading AI Resume Ranking Solutions</h1>
+                <p>Our mission is to positively impact your hiring pipeline by instantly identifying top talent. Upload your requirements and let our semantic matching AI do the heavy lifting.</p>
+                <button class="hero-btn">View How It Works</button>
             </div>
-            
-            <div class="form-group">
-                <label for="resume-upload">Upload Resumes (PDF):</label>
-                <!-- Multi-file input for resumes -->
-                <input type="file" id="resume-upload" accept="application/pdf" multiple>
+            <div class="hero-graphics">
+                <!-- CSS shapes to mimic the circle design in the screenshot -->
+                <div class="circle-main"></div>
+                <div class="circle-small"></div>
+                <div class="dots-pattern"></div>
             </div>
-            
-            <button id="rank-btn">Rank Candidates</button>
-            <p id="status-message"></p>
         </div>
 
+        <!-- The Split Action Cards (Mapped to your Tool) -->
+        <div class="action-cards">
+            <!-- Left Side: Dark Slate -->
+            <div class="card dark-card">
+                <h3>I am an Employer</h3>
+                <p>Elevate sales team performance by providing your exact requirements. Upload your Job Description to set the benchmark.</p>
+                
+                <div class="form-group mt-auto">
+                    <label for="jd-upload">Upload Job Description (PDF)</label>
+                    <input type="file" id="jd-upload" accept="application/pdf">
+                </div>
+            </div>
+            
+            <!-- Right Side: Brand Green -->
+            <div class="card green-card">
+                <h3>Rank Candidates</h3>
+                <p>Ready to find the next heavy hitter? Upload candidate resumes to begin the confidential AI matching process.</p>
+                
+                <div class="form-group mt-auto">
+                    <label for="resume-upload">Upload Resumes (PDF)</label>
+                    <input type="file" id="resume-upload" accept="application/pdf" multiple>
+                </div>
+                
+                <button id="rank-btn">Let's Go! Rank Resumes</button>
+            </div>
+        </div>
+
+        <!-- Status Message -->
+        <p id="status-message"></p>
+
+        <!-- Results Section -->
         <div class="results-grid">
-            <div class="card table-card">
+            <div class="result-box">
                 <h2>Ranking Results</h2>
-                <!-- Empty container for the results table -->
                 <div id="results-table-container">
-                    <p class="placeholder-text">Upload documents and click "Rank Candidates" to view results.</p>
+                    <p class="placeholder-text">Upload documents and click "Let's Go" to view results.</p>
                 </div>
             </div>
 
-            <div class="card explanations-card">
+            <div class="result-box">
                 <h2>Top 3 Candidate Explanations</h2>
-                <!-- Empty container for the top 3 explanations -->
                 <div id="explanations-container">
                     <p class="placeholder-text">Explanations will appear here.</p>
                 </div>
             </div>
         </div>
+        
     </div>
 
     <!-- Main logic as an ES module -->
