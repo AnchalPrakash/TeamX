@@ -1,100 +1,197 @@
+/* --- CSS Variables for consistent theming --- */
 :root {
-    --primary-color: #2563eb;
-    --primary-hover: #1d4ed8;
-    --bg-color: #f3f4f6;
-    --card-bg: #ffffff;
-    --text-main: #1f2937;
-    --text-muted: #6b7280;
-    --border-color: #e5e7eb;
+    --primary-color: #2563eb;       /* Modern Blue */
+    --primary-hover: #1d4ed8;       /* Darker Blue */
+    --bg-color: #f3f4f6;            /* Light Gray background */
+    --card-bg: #ffffff;             /* White */
+    --text-main: #1f2937;           /* Dark Slate */
+    --text-muted: #6b7280;          /* Medium Gray */
+    --border-color: #e5e7eb;        /* Light Gray border */
+    --table-header-bg: #f9fafb;     /* Very Light Gray */
+    --table-alt-row: #f8fafc;       /* Slight Blue-Gray for alternating rows */
 }
 
+/* --- Base Styles --- */
 body {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     background-color: var(--bg-color);
     color: var(--text-main);
     margin: 0;
-    padding: 20px;
+    padding: 30px 20px;
     line-height: 1.6;
 }
 
-.container {
-    max-width: 1000px;
-    margin: 0 auto;
+h1, h2, h3 {
+    color: var(--text-main);
+    margin-top: 0;
 }
 
-h1, h2 {
-    color: var(--text-main);
+h1 {
+    text-align: center;
+    margin-bottom: 30px;
+    font-size: 2.2em;
+    font-weight: 700;
+}
+
+/* --- Layout & Containers --- */
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
 }
 
 .card {
     background: var(--card-bg);
-    padding: 20px 25px;
-    border-radius: 8px;
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-    margin-bottom: 20px;
+    padding: 25px 30px;
+    border-radius: 10px;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    border: 1px solid var(--border-color);
+    margin-bottom: 25px;
 }
 
+/* For larger screens, put the table and explanations side-by-side */
+@media (min-width: 900px) {
+    .results-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 25px;
+    }
+    .results-grid .card {
+        margin-bottom: 0;
+    }
+}
+
+/* --- Form & Input Styles --- */
 .form-group {
-    margin-bottom: 15px;
+    margin-bottom: 20px;
 }
 
 .form-group label {
     display: block;
     font-weight: 600;
     margin-bottom: 8px;
+    color: #374151;
 }
 
-.form-group input[type="file"] {
+input[type="file"] {
     display: block;
     width: 100%;
-    padding: 8px;
-    border: 1px dashed var(--border-color);
-    border-radius: 4px;
-    background-color: #fafafa;
+    box-sizing: border-box;
+    padding: 12px;
+    border: 2px dashed #cbd5e1;
+    border-radius: 8px;
+    background-color: #f8fafc;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all 0.2s ease;
 }
 
+input[type="file"]:hover {
+    border-color: var(--primary-color);
+    background-color: #eff6ff;
+}
+
+/* --- Button Styles --- */
 button {
     background-color: var(--primary-color);
-    color: white;
+    color: #ffffff;
     border: none;
-    padding: 10px 20px;
+    padding: 12px 24px;
     border-radius: 6px;
     font-size: 16px;
+    font-weight: 600;
     cursor: pointer;
-    font-weight: 500;
-    transition: background-color 0.2s;
+    transition: background-color 0.2s ease, transform 0.1s ease;
+    display: inline-block;
 }
 
-button:hover {
+button:hover:not(:disabled) {
     background-color: var(--primary-hover);
+    transform: translateY(-1px);
 }
 
 button:disabled {
-    background-color: var(--text-muted);
+    background-color: #9ca3af;
     cursor: not-allowed;
+    opacity: 0.8;
 }
 
 #status-message {
-    margin-top: 10px;
+    margin-top: 15px;
     font-style: italic;
     color: var(--text-muted);
+    font-size: 0.95em;
 }
 
-.results-grid {
-    display: grid;
-    grid-template-columns: 1fr;
-    gap: 20px;
+/* --- Table Styles --- */
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 15px;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    overflow: hidden; /* Ensures border-radius applies to the outer table */
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
 }
 
-@media (min-width: 768px) {
-    .results-grid {
-        grid-template-columns: 1fr 1fr;
-    }
+th, td {
+    padding: 14px 15px;
+    text-align: left;
+    border-bottom: 1px solid var(--border-color);
+}
+
+th {
+    background-color: var(--table-header-bg);
+    font-weight: 600;
+    color: #374151;
+    text-transform: uppercase;
+    font-size: 0.85em;
+    letter-spacing: 0.05em;
+}
+
+/* Alternating Row Colors */
+tbody tr:nth-child(even) {
+    background-color: var(--table-alt-row);
+}
+
+tbody tr:hover {
+    background-color: #f1f5f9;
+}
+
+/* --- Highlighted Explanation Cards --- */
+#explanations-container > div {
+    background-color: #ffffff;
+    border-left: 5px solid var(--primary-color);
+    padding: 20px;
+    border-radius: 0 8px 8px 0;
+    margin-bottom: 20px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    border-top: 1px solid var(--border-color);
+    border-right: 1px solid var(--border-color);
+    border-bottom: 1px solid var(--border-color);
+}
+
+#explanations-container h3 {
+    margin: 0 0 10px 0;
+    font-size: 1.2em;
+    color: #0f172a;
+}
+
+/* Tags for Skills */
+.skill-tag {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 12px;
+    font-size: 0.85em;
+    font-weight: 500;
+    margin: 3px 3px 3px 0;
 }
 
 .placeholder-text {
     color: var(--text-muted);
     font-style: italic;
     text-align: center;
-    padding: 20px;
+    padding: 30px 20px;
+    background: #f8fafc;
+    border: 1px dashed var(--border-color);
+    border-radius: 6px;
 }
