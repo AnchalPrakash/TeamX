@@ -55,7 +55,17 @@ async function extractTextsFromFiles(fileList) {
     return textsMap;
 }
 
-// --- ALIAS EXPANSION DICTIONARY ---
+// --- 2. KEYWORD MATCHING LOGIC WITH ALIAS EXPANSION ---
+function extractRequiredSkills(jdText) {
+    const sectionRegex = /(?:Required\s+Skills|Technical\s+Skills|Skills)\s*:?\s*\n([\s\S]*?)(?:\n\s*\n|$)/i;
+    const match = jdText.match(sectionRegex);
+    if (!match || !match[1]) return [];
+    
+    return match[1].split(/[\n•\-*]+/)
+        .map(skill => skill.trim())
+        .filter(skill => skill.length > 1 && skill.length < 60);
+}
+
 // Maps broad tech categories to specific frameworks/tools (solves the hackathon constraint!)
 const techSynonyms = {
     "node": ["express", "expressjs", "nestjs", "nodejs"],
@@ -69,9 +79,6 @@ const techSynonyms = {
     "aws": ["amazon web services", "ec2", "s3", "lambda", "cloud"]
 };
 
-/**
- * Upgraded Keyword Scorer with Semantic Synonym Expansion
- */
 function keywordScore(resumeText, requiredSkills) {
     if (!requiredSkills || requiredSkills.length === 0) {
         return { score: 0, matched: [], missing: [] };
@@ -95,11 +102,8 @@ function keywordScore(resumeText, requiredSkills) {
             isMatch = true;
         } else {
             // 2. Synonym / Related Term Expansion
-            // If the JD asks for "Node.js", we check if the resume mentions "Express", etc.
             for (const [broadCategory, relatedTerms] of Object.entries(techSynonyms)) {
-                // If the required skill matches a category OR a term inside a category
                 if (normalizedSkill.includes(broadCategory) || relatedTerms.some(term => normalize(term) === normalizedSkill)) {
-                    // Check if the candidate's resume contains ANY of the related synonym terms
                     const foundRelated = relatedTerms.find(term => lowerResume.includes(term));
                     if (foundRelated) {
                         isMatch = true;
@@ -110,7 +114,7 @@ function keywordScore(resumeText, requiredSkills) {
         }
         
         if (isMatch) {
-            matched.push(skill); // We push the original JD skill so the UI reads cleanly
+            matched.push(skill);
         } else {
             missing.push(skill);
         }
@@ -258,8 +262,10 @@ function answerRecruiterQuestion(question, rankedResults) {
         }
     } else if (matched2 > matched1) {
         answer += `<strong>Keyword Matches:</strong> Interestingly, ${cand2.filename} actually matched more explicit keywords (${matched2} vs ${matched1}), but ${cand1.filename}'s contextual alignment pulled them ahead. <br><br>`;
-    } else if (matched1 > 0) {
+    } else if (matched1 > 0 && matched1 === matched2) {
         answer += `<strong>Keyword Matches:</strong> Both candidates matched the exact same number of required skills (${matched1}). <br><br>`;
+    } else {
+        answer += `<strong>Keyword Matches:</strong> Neither candidate had explicit keyword matches (or no strict "Required Skills" list was found in the JD format). Therefore, this ranking was decided entirely by the Semantic AI understanding the context of their experience. <br><br>`;
     }
 
     if (cand1.semanticScore > cand2.semanticScore) {
