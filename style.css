@@ -1,217 +1,337 @@
-/* --- CSS Variables for consistent theming --- */
+/* --- Color Palette based on Reference Image --- */
 :root {
-    --primary-color: #2563eb;       /* Modern Blue */
-    --primary-hover: #1d4ed8;       /* Darker Blue */
-    --bg-color: #f3f4f6;            /* Light Gray background */
-    --card-bg: #ffffff;             /* White */
-    --text-main: #1f2937;           /* Dark Slate */
-    --text-muted: #6b7280;          /* Medium Gray */
-    --border-color: #e5e7eb;        /* Light Gray border */
-    --table-header-bg: #f9fafb;     /* Very Light Gray */
-    --table-alt-row: #f8fafc;       /* Slight Blue-Gray for alternating rows */
+    --bg-light: #eff5eb;            /* Pale green background */
+    --brand-green: #8cc34f;         /* Vibrant button/card green */
+    --brand-green-hover: #7ab040;
+    --dark-slate: #253d47;          /* Dark blue-grey text and card */
+    --dark-slate-hover: #1c2e35;
+    --white: #ffffff;
+    --border-light: rgba(37, 61, 71, 0.1);
 }
 
-/* --- Base Styles --- */
+/* --- Global Styles --- */
 body {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-    background-color: var(--bg-color);
-    color: var(--text-main);
+    font-family: 'Poppins', sans-serif;
+    background-color: var(--bg-light);
+    color: var(--dark-slate);
     margin: 0;
-    padding: 30px 20px;
+    padding: 0 0 50px 0;
     line-height: 1.6;
 }
 
 h1, h2, h3 {
-    color: var(--text-main);
+    color: var(--dark-slate);
+    font-weight: 700;
     margin-top: 0;
 }
 
-h1 {
-    text-align: center;
-    margin-bottom: 30px;
-    font-size: 2.2em;
-    font-weight: 700;
-}
-
-/* --- Layout & Containers --- */
 .container {
     max-width: 1200px;
     margin: 0 auto;
+    padding: 0 30px;
 }
 
-.card {
-    background: var(--card-bg);
-    padding: 25px 30px;
-    border-radius: 10px;
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-    border: 1px solid var(--border-color);
-    margin-bottom: 25px;
+/* --- Fake Navbar --- */
+.navbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px 40px;
+    max-width: 1400px;
+    margin: 0 auto;
 }
 
-/* For larger screens, put the table and explanations side-by-side */
-@media (min-width: 900px) {
-    .results-grid {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 25px;
-    }
-    .results-grid .card {
-        margin-bottom: 0;
-    }
+.nav-logo {
+    font-size: 1.4em;
+    font-weight: 400;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: var(--brand-green);
 }
 
-/* --- Form & Input Styles --- */
-.form-group {
+.logo-icon {
+    width: 25px;
+    height: 25px;
+    background: var(--brand-green);
+    border-radius: 6px 0 6px 6px;
+    transform: rotate(45deg);
+}
+
+.nav-links a {
+    text-decoration: none;
+    color: var(--dark-slate);
+    font-size: 0.9em;
+    font-weight: 500;
+    margin: 0 15px;
+}
+
+.nav-btn {
+    background-color: var(--brand-green);
+    color: var(--white);
+    border: none;
+    padding: 10px 24px;
+    border-radius: 30px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+/* --- Hero Section --- */
+.hero {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 60px 0 40px 0;
+    position: relative;
+}
+
+.hero-content {
+    flex: 1;
+    max-width: 550px;
+    z-index: 2;
+}
+
+.kicker {
+    color: var(--brand-green);
+    font-weight: 600;
+    letter-spacing: 1px;
+    font-size: 0.85em;
+    margin-bottom: 10px;
+}
+
+.hero-content h1 {
+    font-size: 3.5em;
+    line-height: 1.15;
     margin-bottom: 20px;
 }
 
+.hero-btn {
+    background-color: var(--brand-green);
+    color: var(--white);
+    border: none;
+    padding: 14px 30px;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 1em;
+    cursor: pointer;
+    margin-top: 15px;
+}
+
+/* Abstract graphics to mimic the reference image */
+.hero-graphics {
+    flex: 1;
+    position: relative;
+    height: 400px;
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+}
+
+.circle-main {
+    width: 350px;
+    height: 350px;
+    background-color: var(--dark-slate);
+    border-radius: 50%;
+    position: absolute;
+    right: 50px;
+}
+
+.circle-small {
+    width: 40px;
+    height: 40px;
+    border: 2px solid var(--brand-green);
+    border-radius: 50%;
+    position: absolute;
+    top: 50px;
+    right: 350px;
+}
+
+/* --- Split Action Cards --- */
+.action-cards {
+    display: flex;
+    border-radius: 16px;
+    overflow: hidden;
+    margin: 40px 0;
+    box-shadow: 0 20px 40px rgba(0,0,0,0.08);
+}
+
+.card {
+    flex: 1;
+    padding: 50px;
+    display: flex;
+    flex-direction: column;
+}
+
+.dark-card {
+    background-color: var(--dark-slate);
+    color: var(--white);
+}
+
+.dark-card h3 { color: var(--white); }
+
+.green-card {
+    background-color: var(--brand-green);
+    color: var(--dark-slate);
+}
+
+.mt-auto { margin-top: auto; }
+
+/* Custom File Inputs */
 .form-group label {
     display: block;
     font-weight: 600;
     margin-bottom: 8px;
-    color: #374151;
+    font-size: 0.9em;
 }
 
-/* Style the file input container */
 input[type="file"] {
     display: block;
     width: 100%;
     box-sizing: border-box;
     padding: 12px;
-    border: 2px dashed #cbd5e1;
     border-radius: 8px;
-    background-color: #f8fafc;
-    color: var(--text-muted);
     cursor: pointer;
-    transition: all 0.2s ease;
     font-family: inherit;
+    font-size: 0.9em;
+    transition: all 0.2s ease;
 }
 
-/* Hide the ugly default "Choose File" button and replace it with a custom look */
-input[type="file"]::file-selector-button {
-    background-color: #e2e8f0;
-    color: #475569;
+/* Styling for Dark Card Input */
+.dark-card input[type="file"] {
+    background-color: rgba(255, 255, 255, 0.05);
+    border: 2px dashed rgba(255, 255, 255, 0.3);
+    color: var(--white);
+}
+
+.dark-card input[type="file"]::file-selector-button {
+    background-color: rgba(255,255,255,0.1);
+    color: var(--white);
+    border: 1px solid rgba(255,255,255,0.2);
+}
+
+/* Styling for Green Card Input */
+.green-card input[type="file"] {
+    background-color: rgba(37, 61, 71, 0.05);
+    border: 2px dashed rgba(37, 61, 71, 0.3);
+    color: var(--dark-slate);
+}
+
+.green-card input[type="file"]::file-selector-button {
+    background-color: var(--dark-slate);
+    color: var(--white);
     border: none;
+}
+
+/* Shared File Selector Button styles */
+input[type="file"]::file-selector-button {
     padding: 8px 16px;
-    border-radius: 4px;
+    border-radius: 6px;
     margin-right: 15px;
     font-weight: 600;
     cursor: pointer;
-    transition: background-color 0.2s ease;
+    font-family: inherit;
+    transition: all 0.2s;
 }
 
-input[type="file"]::file-selector-button:hover {
-    background-color: #cbd5e1;
-}
-
-/* The hover state for the whole dashed box */
-input[type="file"]:hover {
-    border-color: var(--primary-color);
-    background-color: #eff6ff;
-}
-
-/* --- Button Styles --- */
-button {
-    background-color: var(--primary-color);
-    color: #ffffff;
+/* Rank Button inside Green Card */
+#rank-btn {
+    background-color: var(--dark-slate);
+    color: var(--white);
     border: none;
-    padding: 12px 24px;
-    border-radius: 6px;
-    font-size: 16px;
+    padding: 16px;
+    border-radius: 8px;
+    font-size: 1.1em;
     font-weight: 600;
     cursor: pointer;
-    transition: background-color 0.2s ease, transform 0.1s ease;
-    display: inline-block;
+    margin-top: 25px;
+    transition: background-color 0.2s;
+    width: 100%;
 }
 
-button:hover:not(:disabled) {
-    background-color: var(--primary-hover);
-    transform: translateY(-1px);
+#rank-btn:hover:not(:disabled) {
+    background-color: var(--dark-slate-hover);
 }
 
-button:disabled {
-    background-color: #9ca3af;
+#rank-btn:disabled {
+    opacity: 0.7;
     cursor: not-allowed;
-    opacity: 0.8;
 }
 
 #status-message {
-    margin-top: 15px;
+    text-align: center;
     font-style: italic;
-    color: var(--text-muted);
-    font-size: 0.95em;
+    font-weight: 500;
+    margin: 20px 0;
 }
 
-/* --- Table Styles --- */
+/* --- Results Section --- */
+.results-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 30px;
+    margin-top: 20px;
+}
+
+@media (min-width: 900px) {
+    .results-grid { grid-template-columns: 1fr 1fr; }
+}
+
+.result-box {
+    background: var(--white);
+    padding: 30px;
+    border-radius: 12px;
+    box-shadow: 0 10px 20px rgba(0,0,0,0.03);
+    border: 1px solid var(--border-light);
+}
+
+.result-box h2 {
+    font-size: 1.4em;
+    margin-bottom: 20px;
+    border-bottom: 2px solid var(--bg-light);
+    padding-bottom: 15px;
+}
+
+/* Table styling for new theme */
 table {
     width: 100%;
     border-collapse: collapse;
-    margin-top: 15px;
-    border: 1px solid var(--border-color);
-    border-radius: 6px;
-    overflow: hidden; /* Ensures border-radius applies to the outer table */
-    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
 }
 
 th, td {
-    padding: 14px 15px;
+    padding: 12px 10px;
     text-align: left;
-    border-bottom: 1px solid var(--border-color);
+    border-bottom: 1px solid var(--border-light);
+    font-size: 0.9em;
 }
 
 th {
-    background-color: var(--table-header-bg);
+    color: var(--dark-slate);
     font-weight: 600;
-    color: #374151;
     text-transform: uppercase;
-    font-size: 0.85em;
-    letter-spacing: 0.05em;
+    font-size: 0.8em;
+    letter-spacing: 0.5px;
 }
 
-/* Alternating Row Colors */
-tbody tr:nth-child(even) {
-    background-color: var(--table-alt-row);
-}
+/* Match Score text color */
+td:nth-child(3) { color: var(--brand-green); font-weight: 700; font-size: 1.1em; }
 
-tbody tr:hover {
-    background-color: #f1f5f9;
-}
-
-/* --- Highlighted Explanation Cards --- */
+/* Explanation Cards */
 #explanations-container > div {
-    background-color: #ffffff;
-    border-left: 5px solid var(--primary-color);
+    background-color: var(--bg-light);
     padding: 20px;
-    border-radius: 0 8px 8px 0;
+    border-radius: 8px;
     margin-bottom: 20px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-    border-top: 1px solid var(--border-color);
-    border-right: 1px solid var(--border-color);
-    border-bottom: 1px solid var(--border-color);
+    border-left: 4px solid var(--brand-green);
 }
 
 #explanations-container h3 {
-    margin: 0 0 10px 0;
-    font-size: 1.2em;
-    color: #0f172a;
-}
-
-/* Tags for Skills */
-.skill-tag {
-    display: inline-block;
-    padding: 3px 10px;
-    border-radius: 12px;
-    font-size: 0.85em;
-    font-weight: 500;
-    margin: 3px 3px 3px 0;
+    margin: 0 0 5px 0;
+    font-size: 1.1em;
 }
 
 .placeholder-text {
-    color: var(--text-muted);
-    font-style: italic;
     text-align: center;
-    padding: 30px 20px;
-    background: #f8fafc;
-    border: 1px dashed var(--border-color);
-    border-radius: 6px;
+    color: #64748b;
+    font-style: italic;
+    padding: 20px;
 }
