@@ -55,24 +55,32 @@ async function extractTextsFromFiles(fileList) {
     return textsMap;
 }
 
-// --- 2. KEYWORD MATCHING LOGIC ---
-function extractRequiredSkills(jdText) {
-    const sectionRegex = /(?:Required\s+Skills|Technical\s+Skills|Skills)\s*:?\s*\n([\s\S]*?)(?:\n\s*\n|$)/i;
-    const match = jdText.match(sectionRegex);
-    if (!match || !match[1]) return [];
-    
-    return match[1].split(/[\n•\-*]+/)
-        .map(skill => skill.trim())
-        .filter(skill => skill.length > 1 && skill.length < 60);
-}
+// --- ALIAS EXPANSION DICTIONARY ---
+// Maps broad tech categories to specific frameworks/tools (solves the hackathon constraint!)
+const techSynonyms = {
+    "node": ["express", "expressjs", "nestjs", "nodejs"],
+    "react": ["reactjs", "nextjs", "react native", "next.js"],
+    "javascript": ["js", "es6", "typescript", "ts"],
+    "python": ["django", "flask", "fastapi", "pandas"],
+    "database": ["sql", "mongodb", "postgres", "postgresql", "mysql", "nosql"],
+    "frontend": ["html", "css", "vue", "angular", "ui", "ux"],
+    "backend": ["api", "rest", "graphql", "server", "microservices"],
+    "versioncontrol": ["git", "github", "gitlab", "bitbucket"],
+    "aws": ["amazon web services", "ec2", "s3", "lambda", "cloud"]
+};
 
+/**
+ * Upgraded Keyword Scorer with Semantic Synonym Expansion
+ */
 function keywordScore(resumeText, requiredSkills) {
     if (!requiredSkills || requiredSkills.length === 0) {
         return { score: 0, matched: [], missing: [] };
     }
 
     const normalize = (str) => str.toLowerCase().replace(/[\W_]+/g, '');
+    const lowerResume = resumeText.toLowerCase(); 
     const normalizedResume = normalize(resumeText);
+    
     const matched = [];
     const missing = [];
     
@@ -80,8 +88,29 @@ function keywordScore(resumeText, requiredSkills) {
         const normalizedSkill = normalize(skill);
         if (normalizedSkill.length === 0) return;
         
+        let isMatch = false;
+
+        // 1. Literal Exact Match
         if (normalizedResume.includes(normalizedSkill)) {
-            matched.push(skill);
+            isMatch = true;
+        } else {
+            // 2. Synonym / Related Term Expansion
+            // If the JD asks for "Node.js", we check if the resume mentions "Express", etc.
+            for (const [broadCategory, relatedTerms] of Object.entries(techSynonyms)) {
+                // If the required skill matches a category OR a term inside a category
+                if (normalizedSkill.includes(broadCategory) || relatedTerms.some(term => normalize(term) === normalizedSkill)) {
+                    // Check if the candidate's resume contains ANY of the related synonym terms
+                    const foundRelated = relatedTerms.find(term => lowerResume.includes(term));
+                    if (foundRelated) {
+                        isMatch = true;
+                        break;
+                    }
+                }
+            }
+        }
+        
+        if (isMatch) {
+            matched.push(skill); // We push the original JD skill so the UI reads cleanly
         } else {
             missing.push(skill);
         }
