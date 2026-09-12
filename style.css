@@ -129,7 +129,7 @@ h1, h2, h3 {
 
 .circle-main {
     width: 350px;
-    height: 350px;
+    height: 340px;
     background-color: var(--dark-slate);
     background-image: url('profile.jpg'); 
     
@@ -141,7 +141,7 @@ h1, h2, h3 {
     border-radius: 50%;
     position: absolute;
     right: 50px;
-    box-shadow: 0 15px 35px rgba(0,0,0,0.15);
+    box-shadow: 0 15px 35px rgba(0,5,0,0.15);
 }
 
 
